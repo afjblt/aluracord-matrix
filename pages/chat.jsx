@@ -1,24 +1,58 @@
 import { Box, Text, TextField, Image, Button } from '@skynexui/components';
 import React from 'react';
 import appConfig from '../config.json';
+import { useRouter } from 'next/router'
+import { createClient } from '@supabase/supabase-js'
+import { ButtonSendSticker } from '../src/components/ButtonSendSticker';
+
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTY0MzM5MzQzOSwiZXhwIjoxOTU4OTY5NDM5fQ.xRuEwWWVQvdEVDrRUhcdBFF-uNPKjgSS2VL0EMJDe10'
+const SUPABASE_URL = 'https://uwiwjsgkfqcogncihjop.supabase.co'
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+function escutaMensagensEmTempoReal(adicionaMensagem) {
+    return supabaseClient
+      .from('mensagens')
+      .on('INSERT', (respostaLive) => {
+        adicionaMensagem(respostaLive.new);
+      })
+      .subscribe();
+  }
 
 export default function ChatPage() {
 
+    const roteamento = useRouter()
+    const usuarioLogado = roteamento.query.username
     const [mensagem, setMessagem] = React.useState('')
     const [listaMensagem, setListaMensagem] = React.useState([])
-    // Sua lógica vai aqui
 
-    // ./Sua lógica vai aqui
+    React.useEffect(() => {
+            supabaseClient.from('mensagens').select('*').order('id', { ascending: false }).then(({ data }) => {
+                console.log('Dados da consulta: ', data)
+                setListaMensagem(data)
+            })
+            escutaMensagensEmTempoReal((novaMensagem) => {
+                setListaMensagem((valorAtualLista) => {
+                    return [
+                        novaMensagem,
+                        ...valorAtualLista,
+                    ]
+                })
+            })
+    }, [])
+
     function handleNovaMensagem(novaMensagem) {
         const mensagem = {
-            id: listaMensagem.length + 1,
-            de: 'vanessametonini',
+            de: usuarioLogado,
             texto: novaMensagem,
         }
-        setListaMensagem([
-            mensagem,
-            ...listaMensagem,
+
+        supabaseClient.from('mensagens').insert([
+            mensagem
         ])
+        .then(({ data }) => {
+            console.log(data)
+        })
+        
         setMessagem('')
     }
 
@@ -61,14 +95,7 @@ export default function ChatPage() {
                 >
 
                     <MessageList mensagens={listaMensagem} setListaMensagem={setListaMensagem}/>
-                    {/* {listaMensagem.map((mensagemAtual) => {
-                        return (
-                            <li key={mensagemAtual.id}>
-                                {mensagemAtual.de}: {mensagemAtual.texto}
-                            </li>
-                        )
-                    })} */}
-
+                    
                     <Box
                         as="form"
                         styleSheet={{
@@ -83,7 +110,10 @@ export default function ChatPage() {
                                 setMessagem(valor)
                             }}
                             onKeyPress={(event) => {
-                                if (event.key === 'Enter') {
+                                if (event.key === 'Enter' && mensagem === '') {
+                                    event.preventDefault()
+                                    return
+                                } else if(event.key === 'Enter') {
                                     event.preventDefault()
                                     handleNovaMensagem(mensagem)
                                 }
@@ -101,12 +131,18 @@ export default function ChatPage() {
                                 color: appConfig.theme.colors.neutrals[200],
                             }}
                         />
+                        <ButtonSendSticker 
+                            onStickerClick={(sticker) => {
+                                handleNovaMensagem(':sticker: ' + sticker)
+                            }}
+                        />
                         <Button 
                             label='ENVIAR'
                             styleSheet={{
                                 backgroundColor: 'green',
                                 padding: '12px',
                                 marginBottom: '8px',
+                                marginLeft: '12px'
                             }}
                             buttonColors={{
                                 contrastColor: appConfig.theme.colors.neutrals["000"],
@@ -150,16 +186,10 @@ function Header() {
 
 function MessageList(props) {
 
-    function handleDeleteMessage(mensagemId){
-        let novaLista = props.mensagens.filter((message)=>{
-            if(message.id != mensagemId){
-                return message
-            }
-        })
-
-        props.setListaMensagem([
-            ...novaLista
-        ])
+     async function handleDeleteMessage(mensagemId){
+        await supabaseClient.from('mensagens').delete().match({ id: mensagemId });
+        props.setListaMensagem(props.mensagens.filter((mensagem) => mensagem.id != mensagemId));
+        
     }
     return (
         <Box
@@ -203,7 +233,7 @@ function MessageList(props) {
                                         display: 'inline-block',
                                         marginRight: '8px',
                                     }}
-                                    src={`https://github.com/vanessametonini.png`}
+                                    src={`https://github.com/${mensagem.de}.png`}
                                 />
                                 <Text tag="strong">
                                     {mensagem.de}
@@ -238,7 +268,12 @@ function MessageList(props) {
                                 onClick={() => handleDeleteMessage(mensagem.id)}
                             />
                         </Box>
-                        {mensagem.texto}
+                        {mensagem.texto.startsWith(':sticker:') ? (
+                        <Image styleSheet={{
+                            width: '180px',
+                        }} src={mensagem.texto.replace(':sticker:', '')}/>
+                        ):mensagem.texto}
+                        {/* {mensagem.texto} */}
                     </Text>
                 )
             })}

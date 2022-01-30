@@ -14,6 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@skynexui/components": "^1.23.6",
+    "@supabase/supabase-js": "^1.29.4",
     "next": "^12.0.8",
     "peer": "^0.6.1",
     "react": "^17.0.2",
