@@ -32,7 +32,7 @@ function Titulo(props) {
 //export default HomePage
 
 export default function PaginaInicial() {
-  const [username, setUsername] = React.useState('peas')
+  const [username, setUsername] = React.useState('afjblt')
   const roteamento = useRouter()
 
   const validateUser = (user) => {
